@@ -4,4 +4,4 @@ Allow: /
 # Служебные страницы не индексируем
 Disallow: /consent.html
 
-Sitemap: https://pc-master-bugulma.ru/sitemap.xml
+Sitemap: https://pc-master-bgm.ru/sitemap.xml
