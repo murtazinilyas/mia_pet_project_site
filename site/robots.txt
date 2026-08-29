@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+
+# Служебные страницы не индексируем
+Disallow: /consent.html
+
+Sitemap: https://pc-master-bugulma.ru/sitemap.xml

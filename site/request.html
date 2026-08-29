@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Оставьте заявку на ремонт и настройку ПК в Бугульме — мастер свяжется с вами в течение 15 минут. Выезд на дом, честные цены, гарантия до 2 лет." />
+  <title>Заявка на ремонт компьютера в Бугульме | ПК-Мастер</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
+  <link rel="canonical" href="https://pc-master-bugulma.ru/request.html" />
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <meta name="theme-color" content="#2563eb" />
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="ПК-Мастер — ремонт ПК в Бугульме" />
+  <meta property="og:title" content="Заявка на ремонт компьютера в Бугульме | ПК-Мастер" />
+  <meta property="og:description" content="Оставьте заявку на ремонт и настройку ПК в Бугульме — мастер свяжется с вами в течение 15 минут." />
+  <meta property="og:url" content="https://pc-master-bugulma.ru/request.html" />
+  <meta property="og:locale" content="ru_RU" />
+
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="Заявка на ремонт компьютера в Бугульме | ПК-Мастер" />
+  <meta name="twitter:description" content="Оставьте заявку на ремонт и настройку ПК в Бугульме — мастер свяжется с вами в течение 15 минут." />
+</head>
+<body>
+  <header class="header">
+    <div class="container header__inner">
+      <a href="index.html" class="logo">
+        <span class="logo__icon"><i data-lucide="monitor"></i></span>
+        <span class="logo__text">ПК-Мастер Бугульма</span>
+      </a>
+      <nav class="nav" id="nav">
+        <a href="index.html" class="nav__link">Главная</a>
+        <a href="services.html" class="nav__link">Услуги</a>
+        <a href="request.html" class="nav__link nav__link--active">Оставить заявку</a>
+        <a href="index.html#contacts" class="nav__link">Контакты</a>
+      </nav>
+      <a href="request.html" class="btn btn--primary btn--sm header__cta">Вызвать мастера</a>
+      <button class="burger" id="burger" aria-label="Меню">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <section class="page-hero">
+      <div class="container">
+        <h1 class="page-hero__title">Оставить заявку</h1>
+        <p class="page-hero__subtitle">Заполните форму, и наш мастер свяжется с вами в удобное для Вас время.</p>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container container--narrow">
+        <form class="form" id="request-form" novalidate>
+          <div class="form__group">
+            <label class="form__label" for="name">Ваше имя *</label>
+            <input class="form__input" type="text" id="name" name="name" placeholder="Иван" required />
+            <span class="form__error" data-error="name"></span>
+          </div>
+
+          <div class="form__group">
+            <label class="form__label" for="phone">Телефон *</label>
+            <input class="form__input" type="tel" id="phone" name="phone" placeholder="+7 (___) ___-__-__" required />
+            <span class="form__error" data-error="phone"></span>
+          </div>
+
+          <div class="form__group">
+            <label class="form__label" for="service">Выберите услугу</label>
+            <select class="form__select" id="service" name="service">
+              <option value="">— Выберите услугу (необязательно) —</option>
+              <optgroup label="Ремонт ПК">
+                <option>Компьютер не включается</option>
+                <option>Замена блока питания</option>
+                <option>Ремонт материнской платы</option>
+                <option>Замена видеокарты</option>
+                <option>Замена процессора</option>
+                <option>Чистка от пыли и замена термопасты</option>
+                <option>Установка SSD</option>
+                <option>Ремонт ноутбука</option>
+                <option>Апгрейд компьютера</option>
+                <option>Сборка ПК под заказ</option>
+              </optgroup>
+              <optgroup label="ПО и настройка">
+                <option>Установка и настройка Windows</option>
+                <option>Оптимизация системы</option>
+                <option>Удаление вирусов</option>
+                <option>Установка программ</option>
+                <option>Настройка интернета и Wi-Fi</option>
+                <option>Настройка 1С</option>
+              </optgroup>
+              <optgroup label="Восстановление данных">
+                <option>Восстановление с жёсткого диска</option>
+                <option>Восстановление с флешки</option>
+                <option>Восстановление после шифровальщика</option>
+              </optgroup>
+              <optgroup label="Другое">
+                <option>Комплексное обслуживание офиса</option>
+                <option>Другая услуга / не знаю</option>
+              </optgroup>
+            </select>
+          </div>
+
+          <div class="form__group">
+            <label class="form__label" for="message">Опишите проблему</label>
+            <textarea class="form__textarea" id="message" name="message" rows="4" placeholder="Например: компьютер включается, но не загружается система..."></textarea>
+          </div>
+<div class="form__group">
+  <label class="form__label" for="address">Адрес</label>
+  <input class="form__input" type="text" id="address" name="address" placeholder="г. Бугульма, ул. ..., дом, кв." />
+</div>
+<div class="form__group">
+  <label class="form__label" for="call_first">Позвонить предварительно?</label>
+  <select class="form__select" id="call_first" name="call_first">
+    <option value="yes">Да, позвонить перед визитом</option>
+    <option value="no">Нет, можно без предварительного звонка</option>
+  </select>
+</div>
+
+<div class="form__group" id="call_time-group">
+  <label class="form__label" for="call_time">Удобное время звонка</label>
+  <input class="form__input" type="text" id="call_time" name="call_time" placeholder="например: после 18:00 / в первой половине дня" />
+</div>
+
+
+
+          <div class="form__group">
+            <label class="form__check">
+              <input type="checkbox" id="agreement" required />
+              <span>Я согласен(а) на <a href="consent.html" target="_blank">обработку персональных данных</a> *</span>
+            </label>
+            <span class="form__error" data-error="agreement"></span>
+          </div>
+
+          <button type="submit" class="btn btn--primary btn--lg btn--full">Отправить заявку</button>
+
+          <div class="form__success" id="form-success" hidden>
+            <span class="form__success-icon"><i data-lucide="circle-check"></i></span>
+            <h3>Заявка отправлена!</h3>
+            <p>Спасибо! Наш мастер свяжется с вами в ближайшее время.</p>
+          </div>
+        </form>
+
+        <p class="form__note">Или позвоните нам напрямую: <a href="tel:+79870065507">+7 (987) 006-55-07</a>. Работаем ежедневно с 9:00 до 21:00.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container footer__inner">
+      <div>
+        <div class="logo">
+          <span class="logo__icon"><i data-lucide="monitor"></i></span>
+          <span class="logo__text">ПК-Мастер Бугульма</span>
+        </div>
+        <p class="footer__text">Ремонт и настройка компьютеров в Бугульме и Бугульминском районе.</p>
+      </div>
+      <nav class="footer__nav">
+        <a href="index.html">Главная</a>
+        <a href="services.html">Услуги</a>
+        <a href="request.html">Оставить заявку</a>
+        <a href="index.html#contacts">Контакты</a>
+      </nav>
+    </div>
+    <div class="container footer__bottom">
+      <p>© <span id="year"></span> ПК-Мастер Бугульма. Все права защищены.</p>
+    </div>
+  </footer>
+
+  <script src="js/main.js"></script>
+</body>
+</html>
