@@ -1,18 +1,21 @@
 #!/usr/bin/env python3
 """
-ПК-Мастер — сервер сайта с интеграцией Битрикс24.
+ПК-Мастер — сервер сайта.
 Раздаёт статические файлы сайта (из папки ../site) и обрабатывает
-POST /api/request, создавая лид в CRM Битрикс24 через вебхук.
+POST /api/request — отправляет заявку по Email и в Telegram.
 
-Настройки вебхука берутся из файла config.env (переменная BITRIX_WEBHOOK_URL).
+Настройки берутся из файла config.env.
 Запуск:  python3 server.py   (по умолчанию порт 8080)
 Переменная окружения PORT позволяет сменить порт.
 """
 import datetime
 import json
 import os
+import smtplib
 import sys
 import urllib.request
+import urllib.parse
+from email.message import EmailMessage
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -36,27 +39,16 @@ def load_config():
 
 
 CONFIG = load_config()
-BITRIX_WEBHOOK_URL = CONFIG.get('BITRIX_WEBHOOK_URL', '')
 LOG_FILE = CONFIG.get('LOG_FILE', '')
-
-
-def is_configured():
-    """True, если в config.env вписан реальный адрес вебхука."""
-    url = BITRIX_WEBHOOK_URL.strip()
-    if not url:
-        return False
-    if 'ВСТАВЬТЕ' in url:
-        return False
-    return True
-
-
-def bitrix_webhook_url(method):
-    """Собирает полный URL метода REST из базового адреса вебхука."""
-    base = BITRIX_WEBHOOK_URL.strip().rstrip('/')
-    # Если пользователь вписал полный URL метода (уже .json) — используем как есть
-    if base.lower().endswith('.json'):
-        return base
-    return f'{base}/{method}.json'
+EMAIL_TO = CONFIG.get('EMAIL_TO', 'request@pc-master-bgm.ru')
+SMTP_HOST = CONFIG.get('SMTP_HOST', 'localhost').strip()
+SMTP_PORT = int(CONFIG.get('SMTP_PORT', '25'))
+SMTP_USERNAME = CONFIG.get('SMTP_USERNAME', '').strip()
+SMTP_PASSWORD = CONFIG.get('SMTP_PASSWORD', '').strip()
+SMTP_FROM = CONFIG.get('SMTP_FROM', EMAIL_TO).strip()
+SMTP_USE_TLS = CONFIG.get('SMTP_USE_TLS', 'false').strip().lower() in {'1', 'true', 'yes', 'on'}
+TELEGRAM_BOT_TOKEN = CONFIG.get('TELEGRAM_BOT_TOKEN', '').strip()
+TELEGRAM_CHAT_ID = CONFIG.get('TELEGRAM_CHAT_ID', '').strip()
 
 
 def write_log_file(line):
@@ -83,58 +75,79 @@ def log(msg):
     write_log_file(line)
 
 
-def create_bitrix_lead(data):
-    """
-    Создаёт лид в Битрикс24 (crm.lead.add).
-    Возвращает True при успехе, False при ошибке.
-    Если вебхук не настроен — логирует заявку и возвращает True (для теста).
-    """
-    if not is_configured():
-        log(f'[BITRIX24 НЕ НАСТРОЕН] Заявка: {json.dumps(data, ensure_ascii=False)}')
-        return True
-
+def format_email_body(data):
+    """Формирует текст письма с данными заявки."""
     call_first = 'Да, позвонить перед визитом' if data.get('call_first') == 'yes' else 'Нет'
-
-    comments_lines = [
-        f'Услуга: {data.get("service") or "-"}',
-        f'Удобное время звонка: {data.get("call_time") or "-"}',
-        f'Позвонить предварительно: {call_first}',
+    lines = [
+        'Новая заявка с сайта ПК-Мастер',
+        '================================',
+        f"Имя: {data.get('name') or '-'}",
+        f"Телефон: {data.get('phone') or '-'}",
+        f"Город: {data.get('city') or '-'}",
+        f"Адрес: {data.get('address') or '-'}",
+        f"Услуга: {data.get('service') or '-'}",
+        f"Удобное время звонка: {data.get('call_time') or '-'}",
+        f"Позвонить заранее: {call_first}",
     ]
     if data.get('message'):
-        comments_lines.append(f'Описание: {data.get("message")}')
+        lines.append(f"Комментарий: {data.get('message')}")
+    lines.append('')
+    lines.append(f"Дата/время: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    return '\n'.join(lines)
 
-    fields = {
-        'TITLE': f"Заявка с сайта — {data.get('service') or 'Ремонт ПК'}",
-        'NAME': data.get('name', ''),
-        'CITY': data.get('city', ''),
-        'ADDRESS': data.get('address', ''),
-        'SOURCE_ID': 'WEBFORM',
-        'SOURCE_DESCRIPTION': 'Форма на сайте ПК-Мастер',
-        'PHONE': [{'VALUE': data.get('phone', ''), 'VALUE_TYPE': 'WORK'}],
-        'COMMENTS': '\n'.join(comments_lines),
-    }
 
-    payload = {'fields': fields}
-    url = bitrix_webhook_url('crm.lead.add')
+def send_email_request(data):
+    """Отправляет заявку на почту через SMTP."""
+    subject = f"Новая заявка — {data.get('service') or 'Ремонт ПК'}"
+    message = EmailMessage()
+    message['From'] = SMTP_FROM
+    message['To'] = EMAIL_TO
+    message['Subject'] = subject
+    message.set_content(format_email_body(data), charset='utf-8')
 
-    req = urllib.request.Request(
-        url,
-        data=json.dumps(payload).encode('utf-8'),
-        headers={'Content-Type': 'application/json'},
-        method='POST',
-    )
+    if not SMTP_HOST:
+        log(f'[EMAIL] SMTP_HOST не настроен. Заявка не отправлена: {json.dumps(data, ensure_ascii=False)}')
+        return False
 
     try:
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as smtp:
+            if SMTP_USE_TLS:
+                smtp.starttls()
+            if SMTP_USERNAME:
+                smtp.login(SMTP_USERNAME, SMTP_PASSWORD)
+            smtp.send_message(message)
+        log(f'[EMAIL] Заявка отправлена на {EMAIL_TO}')
+        return True
+    except Exception as exc:
+        log(f'[EMAIL] Ошибка отправки письма: {exc}')
+        log(f'[EMAIL] Заявка для отправки: {json.dumps(data, ensure_ascii=False)}')
+        return False
+
+
+def send_telegram_message(data):
+    """Отправляет уведомление в Telegram (бот -> чат).
+    Если токен или chat_id не настроены — молча пропускаем и возвращаем True.
+    """
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+        log('[TG] Telegram не настроен — пропускаем отправку')
+        return True
+
+    # Используем тот же текст, что и в письме (серверная сторона; токен не попадёт в JS)
+    text = format_email_body(data)
+    url = f'https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage'
+    post = urllib.parse.urlencode({'chat_id': TELEGRAM_CHAT_ID, 'text': text}).encode('utf-8')
+    req = urllib.request.Request(url, data=post, headers={'Content-Type': 'application/x-www-form-urlencoded'})
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
             body = resp.read().decode('utf-8')
-            result = json.loads(body)
-            if 'result' in result:
-                log(f'[Битрикс24] Лид создан, id: {result["result"]}')
+            res = json.loads(body)
+            if res.get('ok'):
+                log(f'[TG] Уведомление отправлено в Telegram chat_id={TELEGRAM_CHAT_ID}')
                 return True
-            log(f'[Ошибка Битрикс24]: {body}')
+            log(f'[TG] Ошибка API Telegram: {body}')
             return False
     except Exception as exc:
-        log(f'[Ошибка отправки в Битрикс24]: {exc}')
+        log(f'[TG] Ошибка отправки в Telegram: {exc}')
         return False
 
 
@@ -154,8 +167,9 @@ class Handler(SimpleHTTPRequestHandler):
                 self.send_json(400, {'ok': False, 'error': 'Некорректные данные заявки'})
                 return
 
-            ok = create_bitrix_lead(data)
-            if ok:
+            email_ok = send_email_request(data)
+            tg_ok = send_telegram_message(data)
+            if email_ok or tg_ok:
                 self.send_json(200, {'ok': True, 'message': 'Заявка отправлена'})
             else:
                 self.send_json(500, {'ok': False, 'error': 'Не удалось отправить заявку'})
@@ -181,10 +195,9 @@ if __name__ == '__main__':
     log(f'  Статика:   {SITE_DIR}')
     log(f'  Откройте:  http://localhost:{port}')
     log(f'  Логи:      {LOG_FILE if LOG_FILE else "(запись логов отключена)"}')
-    if is_configured():
-        log('  Битрикс24: настроен (создание лидов активно)')
-    else:
-        log('  Битрикс24: НЕ настроен — впишите BITRIX_WEBHOOK_URL в config.env')
+    log(f'  Email to:  {EMAIL_TO}')
+    log(f'  SMTP:      {SMTP_HOST}:{SMTP_PORT}')
+    log(f'  Telegram:  {"настроен" if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID else "НЕ настроен"}')
     log('  Остановка: Ctrl+C')
     log('=' * 50)
     try:
