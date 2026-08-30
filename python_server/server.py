@@ -181,8 +181,26 @@ def send_telegram_message(data):
 
 
 class Handler(SimpleHTTPRequestHandler):
+    def get_client_ip(self):
+        """Возвращает реальный IP клиента, учитывая заголовки реверс-прокси.
+
+        Порядок: `X-Forwarded-For` (первый в списке), `X-Real-IP`, затем
+        `self.client_address[0]` как запасной вариант.
+        """
+        # Обычно прокси передаёт оригинальный IP в X-Forwarded-For
+        xff = self.headers.get('X-Forwarded-For') or self.headers.get('x-forwarded-for')
+        if xff:
+            # Может быть список: client, proxy1, proxy2
+            return xff.split(',')[0].strip()
+        xrip = self.headers.get('X-Real-IP') or self.headers.get('x-real-ip')
+        if xrip:
+            return xrip.strip()
+        # fallback — адрес TCP-соединения
+        return self.client_address[0]
+
     def log_message(self, fmt, *args):  # компактный лог (консоль + файл)
-        msg = '%s - %s' % (self.address_string(), fmt % args)
+        client_ip = self.get_client_ip()
+        msg = '%s - %s' % (client_ip, fmt % args)
         sys.stderr.write(msg + '\n')
         write_log_file(f'{datetime.datetime.now().isoformat(timespec="seconds")}  {msg}')
 

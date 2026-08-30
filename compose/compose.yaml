@@ -3,7 +3,7 @@ include:
 services:
   web:
     container_name: mia-site
-    image: cr.yandex/${REGISTRY_ID}/mia-site:1.3
+    image: cr.yandex/${REGISTRY_ID}/mia-site:1.4
     expose:
       - 8080
     volumes:
