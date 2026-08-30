@@ -1,0 +1,12 @@
+services:
+
+  ingress-proxy:
+    container_name: mia-reverse-proxy
+    image: nginx:latest
+    restart: always
+    network_mode: host
+    volumes:
+    - /home/user/app/default.conf:/etc/nginx/conf.d/default.conf:rw
+    - /home/user/app/nginx.conf:/etc/nginx/nginx.conf:rw
+    - /etc/letsencrypt/live/pc-master-bgm.ru/fullchain.pem:/etc/nginx/ssl/fullchain.pem:ro
+    - /etc/letsencrypt/live/pc-master-bgm.ru/privkey.pem:/etc/nginx/ssl/privkey.pem:ro

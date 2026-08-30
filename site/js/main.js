@@ -179,7 +179,8 @@ document.addEventListener('DOMContentLoaded', function () {
       address: form.querySelector('[name="address"]').value.trim(),
       call_time: form.querySelector('[name="call_time"]').value.trim(),
       call_first: form.querySelector('[name="call_first"]').value,
-      message: form.querySelector('[name="message"]').value.trim()
+      message: form.querySelector('[name="message"]').value.trim(),
+      agreement: form.querySelector('[name="agreement"]').checked
     };
 
     // Отправляем заявку на сервер (server.py -> Telegram)

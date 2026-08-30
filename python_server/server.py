@@ -76,6 +76,24 @@ def log(msg):
     write_log_file(line)
 
 
+def validate_request_data(data):
+    """Проверяет, что заявка содержит обязательное согласие на обработку персональных данных."""
+    if not isinstance(data, dict):
+        raise ValueError('Некорректные данные заявки')
+
+    agreement = data.get('agreement')
+    if isinstance(agreement, str):
+        agreement = agreement.strip().lower()
+        data['agreement'] = agreement in {'1', 'true', 'yes', 'on'}
+    elif agreement is None:
+        raise ValueError('Необходимо согласие на обработку персональных данных.')
+
+    if not data.get('agreement'):
+        raise ValueError('Необходимо согласие на обработку персональных данных.')
+
+    return data
+
+
 def format_email_body(data):
     """Формирует текст письма с данными заявки."""
     call_first = 'Да, позвонить перед визитом' if data.get('call_first') == 'yes' else 'Нет'
@@ -89,6 +107,7 @@ def format_email_body(data):
         f"Услуга: {data.get('service') or '-'}",
         f"Удобное время звонка: {data.get('call_time') or '-'}",
         f"Позвонить заранее: {call_first}",
+        f"Согласие на обработку ПД: {'Да' if data.get('agreement') else 'Нет'}",
     ]
     if data.get('message'):
         lines.append(f"Комментарий: {data.get('message')}")
@@ -173,8 +192,9 @@ class Handler(SimpleHTTPRequestHandler):
             raw = self.rfile.read(length) if length else b''
             try:
                 data = json.loads(raw.decode('utf-8'))
+                data = validate_request_data(data)
             except (ValueError, UnicodeDecodeError):
-                self.send_json(400, {'ok': False, 'error': 'Некорректные данные заявки'})
+                self.send_json(400, {'ok': False, 'error': 'Необходимо согласие на обработку персональных данных.'})
                 return
 
             email_ok = send_email_request(data)
