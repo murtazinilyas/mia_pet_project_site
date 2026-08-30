@@ -49,6 +49,7 @@ SMTP_FROM = CONFIG.get('SMTP_FROM', EMAIL_TO).strip()
 SMTP_USE_TLS = CONFIG.get('SMTP_USE_TLS', 'false').strip().lower() in {'1', 'true', 'yes', 'on'}
 TELEGRAM_BOT_TOKEN = CONFIG.get('TELEGRAM_BOT_TOKEN', '').strip()
 TELEGRAM_CHAT_ID = CONFIG.get('TELEGRAM_CHAT_ID', '').strip()
+TELEGRAM_PROXY = CONFIG.get('TELEGRAM_PROXY', '').strip()
 
 
 def write_log_file(line):
@@ -138,14 +139,23 @@ def send_telegram_message(data):
     post = urllib.parse.urlencode({'chat_id': TELEGRAM_CHAT_ID, 'text': text}).encode('utf-8')
     req = urllib.request.Request(url, data=post, headers={'Content-Type': 'application/x-www-form-urlencoded'})
     try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            body = resp.read().decode('utf-8')
-            res = json.loads(body)
-            if res.get('ok'):
-                log(f'[TG] Уведомление отправлено в Telegram chat_id={TELEGRAM_CHAT_ID}')
-                return True
-            log(f'[TG] Ошибка API Telegram: {body}')
-            return False
+        # Если настроен прокси для Telegram, используем его
+        if TELEGRAM_PROXY:
+            proxy = TELEGRAM_PROXY
+            proxy_handler = urllib.request.ProxyHandler({'http': proxy, 'https': proxy})
+            opener = urllib.request.build_opener(proxy_handler)
+            with opener.open(req, timeout=10) as resp:
+                body = resp.read().decode('utf-8')
+        else:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                body = resp.read().decode('utf-8')
+
+        res = json.loads(body)
+        if res.get('ok'):
+            log(f'[TG] Уведомление отправлено в Telegram chat_id={TELEGRAM_CHAT_ID}')
+            return True
+        log(f'[TG] Ошибка API Telegram: {body}')
+        return False
     except Exception as exc:
         log(f'[TG] Ошибка отправки в Telegram: {exc}')
         return False
