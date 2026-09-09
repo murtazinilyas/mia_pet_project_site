@@ -100,14 +100,13 @@ def format_email_body(data):
     lines = [
         'Новая заявка с сайта ПК-Мастер',
         '================================',
+        f"Услуга: {data.get('service') or '-'}",
         f"Имя: {data.get('name') or '-'}",
         f"Телефон: {data.get('phone') or '-'}",
-        f"Город: {data.get('city') or '-'}",
         f"Адрес: {data.get('address') or '-'}",
-        f"Услуга: {data.get('service') or '-'}",
-        f"Удобное время звонка: {data.get('call_time') or '-'}",
         f"Позвонить заранее: {call_first}",
-        f"Согласие на обработку ПД: {'Да' if data.get('agreement') else 'Нет'}",
+        f"Удобное время звонка: {data.get('call_time') or '-'}",
+
     ]
     if data.get('message'):
         lines.append(f"Комментарий: {data.get('message')}")
