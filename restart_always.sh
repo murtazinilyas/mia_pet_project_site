@@ -159,15 +159,48 @@ update_beget_dns() {
     log "DNS запись успешно обновлена."
 }
 
+# Проверка доступности сайта: возвращает HTTP-код ответа
+# (или "000", если сервер не отвечает / соединение не установлено)
+site_http_code() {
+    curl -s -o /dev/null -w "%{http_code}" \
+        --connect-timeout 10 --max-time 20 \
+        "https://${BEGET_DOMAIN}" || echo "000"
+}
+
+# Ожидание, пока сайт не начнёт отвечать любым HTTP-кодом.
+# Возвращает 0, как только получен любой код ответа.
+wait_site_ready() {
+    local timeout="${1:-300}"  # максимум секунд ожидания
+    local waited=0
+
+    while (( waited < timeout )); do
+        local code
+        code="$(site_http_code)"
+        if [[ "${code}" != "000" ]]; then
+            log "Сайт отвечает (HTTP ${code})."
+            return 0
+        fi
+        log "Сайт пока не отвечает (HTTP ${code}). Подожду 10 c..."
+        sleep 10
+        waited=$((waited+10))
+    done
+
+    return 1
+}
+
 # ============================================================
 #                        ГЛАВНАЯ ЛОГИКА
 # ============================================================
+
 main() {
     [[ -z "${BEGET_API_LOGIN}" ]] && die "Не задан BEGET_API_LOGIN"
 
     log "=== Проверка ВМ '${VM_NAME}' ==="
 
-    local vm_info status nat_ip
+    local profile_args=()
+    [[ -n "${YC_PROFILE}" ]] && profile_args+=(--profile "${YC_PROFILE}")
+
+    local vm_info status nat_ip attempts=0 max_attempts=5
     vm_info="$(get_vm_info)" || die "Не удалось получить информацию о ВМ '${VM_NAME}'. Проверьте yc CLI/авторизацию."
 
     status="$(get_status "${vm_info}")"
@@ -175,55 +208,70 @@ main() {
 
     log "Статус ВМ: ${status}, публичный IP: ${nat_ip:-нет}"
 
-    if [[ "${status}" != "RUNNING" ]]; then
-        log "ВМ не запущена (${status}). Выполняю запуск..."
-        local profile_args=()
-        [[ -n "${YC_PROFILE}" ]] && profile_args+=(--profile "${YC_PROFILE}")
+    # Иногда после старта ВМ в Яндекс.Облаке машина недоступна ни по SSH,
+    # ни по HTTP. Повторяем запуск/перезапуск в цикле до тех пор, пока сайт
+    # не ответит любым HTTP-кодом.
+    while true; do
+        attempts=$((attempts+1))
+        log "--- Попытка #${attempts} из ${max_attempts} ---"
 
-        if [[ "${status}" == "STOPPED" ]]; then
-            yc compute instance start "${VM_NAME}" "${profile_args[@]}" >/dev/null || die "Не удалось запустить ВМ"
+        if [[ "${status}" != "RUNNING" ]]; then
+            log "ВМ не запущена (${status}). Выполняю запуск..."
+            if [[ "${status}" == "STOPPED" ]]; then
+                yc compute instance start "${VM_NAME}" "${profile_args[@]}" >/dev/null || die "Не удалось запустить ВМ"
+            fi
+
+            wait_vm_ready || die "ВМ не стала доступной за отведённое время."
+            # После перезапуска внешний IP мог измениться — берём свежий
+            vm_info="$(get_vm_info)"
+            nat_ip="$(get_nat_ip "${vm_info}")"
+        else
+            log "ВМ запущена (${status}). Останавливаю..."
+            yc compute instance stop "${VM_NAME}" "${profile_args[@]}" >/dev/null || die "Не удалось остановить ВМ"
+
+            wait_vm_stopped || die "ВМ не остановилась за отведнное время."
+            
+            vm_info="$(get_vm_info)"
+
+            log "Перезапускаю..."
+                yc compute instance start "${VM_NAME}" "${profile_args[@]}" >/dev/null || die "Не удалось запустить ВМ"
+
+            wait_vm_ready || die "ВМ не стала доступной за отведнное время."
+            # После перезапуска внешний IP мог измениться — берем свежий
+            vm_info="$(get_vm_info)"
+            status="$(get_status "${vm_info}")"
+            nat_ip="$(get_nat_ip "${vm_info}")"
         fi
 
-        wait_vm_ready || die "ВМ не стала доступной за отведённое время."
-        # После перезапуска внешний IP мог измениться — берём свежий
-        vm_info="$(get_vm_info)"
-        nat_ip="$(get_nat_ip "${vm_info}")"
-    else
-        if [[ "${status}" == "RUNNING" ]]; then
-        log "ВМ запущена (${status}). Останавливаю..."
-        yc compute instance stop "${VM_NAME}" "${profile_args[@]}" >/dev/null || die "Не удалось остановить ВМ"
+        [[ -z "${nat_ip}" ]] && die "Не удалось определить публичный IP-адрес ВМ."
 
-        wait_vm_stopped || die "ВМ не остановилась за отведнное время."
-        
-        vm_info="$(get_vm_info)"
-        status="$(get_status "${vm_info}")"
-        fi
-        log "Перезапускаю..."
-        if [[ "${status}" == "STOPPED" ]]; then
-            yc compute instance start "${VM_NAME}" "${profile_args[@]}" >/dev/null || die "Не удалось запустить ВМ"
+        # 4. Сравниваем с предыдущим IP — если не изменился, DNS трогать не нужно
+        local prev_ip=""
+        [[ -f "${LAST_IP_FILE}" ]] && prev_ip="$(cat "${LAST_IP_FILE}")"
+
+        if [[ "${prev_ip}" == "${nat_ip}" ]]; then
+            log "IP не изменился (${nat_ip}). Обновление DNS не требуется."
+        else
+            log "Новый публичный IP: ${nat_ip} (предыдущий: ${prev_ip:-нет})."
+            # Записываем новый адрес в файл
+            echo "${nat_ip}" > "${LAST_IP_FILE}"
+            # Обновляем DNS в Beget
+            update_beget_dns "${nat_ip}"
         fi
 
-        wait_vm_ready || die "ВМ не стала доступной за отведнное время."
-        # После перезапуска внешний IP мог измениться — берем свежий
-        vm_info="$(get_vm_info)"
-        nat_ip="$(get_nat_ip "${vm_info}")"
-    fi
+        # Как только сайт ответил любым HTTP-кодом — выходим из цикла
+        if wait_site_ready; then
+            break
+        fi
 
-    [[ -z "${nat_ip}" ]] && die "Не удалось определить публичный IP-адрес ВМ."
+        # Не даём скрипту крутиться вечно
+        if (( attempts >= max_attempts )); then
+            die "Сайт не стал доступен после ${max_attempts} попыток перезапуска."
+        fi
 
-    # 4. Сравниваем с предыдущим IP — если не изменился, DNS трогать не нужно
-    local prev_ip=""
-    [[ -f "${LAST_IP_FILE}" ]] && prev_ip="$(cat "${LAST_IP_FILE}")"
-
-    if [[ "${prev_ip}" == "${nat_ip}" ]]; then
-        log "IP не изменился (${nat_ip}). Обновление DNS не требуется."
-    else
-        log "Новый публичный IP: ${nat_ip} (предыдущий: ${prev_ip:-нет})."
-        # Записываем новый адрес в файл
-        echo "${nat_ip}" > "${LAST_IP_FILE}"
-        # Обновляем DNS в Beget
-        update_beget_dns "${nat_ip}"
-    fi
+        log "Сайт недоступен — повторяю перезапуск ВМ."
+    
+    done
 
     log "=== Готово. Публичный IP ВМ: ${nat_ip} ==="
 }
