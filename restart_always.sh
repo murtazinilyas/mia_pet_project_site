@@ -14,18 +14,24 @@
 #
 set -euo pipefail
 
+# 1. Явно задаём PATH, чтобы cron видел yc, jq, curl
+export PATH="/home/van/yandex-cloud/bin:/usr/bin:$PATH"
+
+
+# Задаем переменные окружения для yc
+export HOME="/home/van"
+export YC_CONFIG_DIR="${HOME}/.config/yandex-cloud"
+export YC_PROFILE="default"
+
 # Ключ API Beget (раздел "Настройки" -> "API" в панели управления)
 # Записываем переменные $BEGET_API_LOGIN и BEGET_API_PASS в файл .env и считываем их оттуда
 set -a
-source .env
+source /home/van/site/.env
 set +a
 
 # ======================= КОНФИГУРАЦИЯ =======================
 # Имя (или ID) ВМ в Яндекс.Облаке
 VM_NAME="mia-project-vm-1"
-
-# Профиль YC (необязательно; укажите, если профилей несколько)
-YC_PROFILE=""
 
 # --- Параметры DNS Beget ---
 # Домен, для которого меняем запись (например: example.ru)
@@ -36,14 +42,15 @@ BEGET_TTL=600
 BEGET_API_BASE="https://api.beget.com/api"
 
 # Файл, куда сохраняется последний использованный IP (для логирования и сравнения)
-LAST_IP_FILE="$(dirname "$(realpath "$0")")/.last_nat_ip"
-# Файл лога (используется, если вывод не перенаправлен в cron)
-LOG_FILE="$(dirname "$(realpath "$0")")/vm-check.log"
+SCRIPT_DIR="/home/van/site"
+LAST_IP_FILE="${SCRIPT_DIR}/.last_nat_ip"
+# Файл, куда будет вестись лог
+# LOG_FILE="${SCRIPT_DIR}/vm-check.log"
 # ===========================================================
 
 log() {
     local msg="$*"
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] ${msg}" | tee -a "${LOG_FILE}"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] ${msg}" # | tee -a "${LOG_FILE}" # Расскомментируй для записи в лог
 }
 
 die() {
@@ -57,7 +64,7 @@ die() {
 get_vm_info() {
     local profile_args=()
     [[ -n "${YC_PROFILE}" ]] && profile_args+=(--profile "${YC_PROFILE}")
-    yc compute instance get "${VM_NAME}" "${profile_args[@]}" --format json 2>/dev/null
+    yc compute instance get "${VM_NAME}" "${profile_args[@]}" --format json
 }
 
 # Извлечение статуса ВМ из JSON
@@ -201,7 +208,10 @@ main() {
     [[ -n "${YC_PROFILE}" ]] && profile_args+=(--profile "${YC_PROFILE}")
 
     local vm_info status nat_ip attempts=0 max_attempts=5
-    vm_info="$(get_vm_info)" || die "Не удалось получить информацию о ВМ '${VM_NAME}'. Проверьте yc CLI/авторизацию."
+    vm_info="$(get_vm_info)" || {
+    log "yc вернул ошибку: $(get_vm_info 2>&1)"
+    die "Не удалось получить информацию о ВМ '${VM_NAME}'. Проверьте yc CLI/авторизацию."
+}
 
     status="$(get_status "${vm_info}")"
     nat_ip="$(get_nat_ip "${vm_info}")"
