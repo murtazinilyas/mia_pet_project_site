@@ -46,7 +46,6 @@ SMTP_PORT = int(CONFIG.get('SMTP_PORT', '25'))
 SMTP_USERNAME = CONFIG.get('SMTP_USERNAME', '').strip()
 SMTP_PASSWORD = CONFIG.get('SMTP_PASSWORD', '').strip()
 SMTP_FROM = CONFIG.get('SMTP_FROM', EMAIL_TO).strip()
-SMTP_USE_TLS = CONFIG.get('SMTP_USE_TLS', 'false').strip().lower() in {'1', 'true', 'yes', 'on'}
 TELEGRAM_BOT_TOKEN = CONFIG.get('TELEGRAM_BOT_TOKEN', '').strip()
 TELEGRAM_CHAT_ID = CONFIG.get('TELEGRAM_CHAT_ID', '').strip()
 TELEGRAM_PROXY = CONFIG.get('TELEGRAM_PROXY', '').strip()
@@ -129,9 +128,8 @@ def send_email_request(data):
         return False
 
     try:
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as smtp:
-            if SMTP_USE_TLS:
-                smtp.starttls()
+        # SSL only — прямое TLS-подключение (smtp.mail.ru:465, без STARTTLS)
+        with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=15) as smtp:
             if SMTP_USERNAME:
                 smtp.login(SMTP_USERNAME, SMTP_PASSWORD)
             smtp.send_message(message)

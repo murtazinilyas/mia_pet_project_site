@@ -81,16 +81,15 @@ http://localhost:8080
 
 Настройки читаются из файла [config.env](config.env).
 
-Пример:
+Пример для mail.ru (подключение только по SSL, без STARTTLS):
 
 ```env
-EMAIL_TO=your_mail
-SMTP_HOST=smtp_host
-SMTP_PORT=smtp_port
-SMTP_USE_TLS=false
-SMTP_USERNAME=your_mail
-SMTP_PASSWORD=your_password
-SMTP_FROM=your_mail
+EMAIL_TO=your_mail@mail.ru
+SMTP_HOST=smtp.mail.ru
+SMTP_PORT=465
+SMTP_USERNAME=your_mail@mail.ru
+SMTP_PASSWORD=app_password
+SMTP_FROM=your_mail@mail.ru
 
 TELEGRAM_BOT_TOKEN=
 TELEGRAM_CHAT_ID=
@@ -103,6 +102,8 @@ LOG_FILE=../logs/app.log
 
 - `EMAIL_TO` — адрес, на который уходят письма с заявками.
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM` — параметры SMTP.
+  Для mail.ru: `SMTP_HOST=smtp.mail.ru`, `SMTP_PORT=465` (SSL only), логин — полный e-mail,
+  пароль — пароль приложения (создаётся в настройках почты mail.ru → «Пароли для внешних приложений»).
 - `TELEGRAM_BOT_TOKEN` и `TELEGRAM_CHAT_ID` — настройки Telegram-уведомлений.
 - `TELEGRAM_PROXY` — необязательный прокси для Telegram API.
 - `LOG_FILE` — путь к файлу логов, можно указывать относительный или абсолютный путь.
